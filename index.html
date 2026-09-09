@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="tr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="theme-color" content="#0c2029"><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230c2029'/%3E%3Ctext x='9' y='48' font-size='55' fill='%23e4be84'%3E≈%3C/text%3E%3C/svg%3E"><title>Denizinebesi — Açık denize</title></head>
+<body>
+  <div id="scene"></div>
+  <div id="loading"><div class="loading-mark">≈</div><h1>DENİZİNEBESİ</h1><p id="loading-message">Okyanus hazırlanıyor…</p><span>Biraz uzaklaş.</span></div>
+  <main id="hud">
+    <header><div class="brand"><span class="brand-mark">≈</span><div>DENİZİNEBESİ<small>AÇIK DENİZ SİMÜLASYONU</small></div></div><div class="top-right"><span class="live"><i></i> SERBEST SEYİR</span><button id="settings-toggle" aria-label="Ayarları aç veya kapat">☷</button></div></header>
+    <section class="intro"><span class="eyebrow">38° 24′ N &nbsp; 26° 18′ E</span><h1>Ufkun ötesine.</h1><p>Bir tekne. Sonsuz bir okyanus.</p></section>
+    <aside id="settings" class="panel"><div class="panel-title">SEYİR AYARLARI <span>01 / 04</span></div>
+      <label>Günün saati <output id="time-label">16:00</output><input id="time" type="range" min="0" max="23.99" step="0.01" value="16"></label>
+      <div class="presets"><button data-hour="12">Gündüz</button><button data-hour="17.5">Gün batımı</button><button data-hour="0">Gece</button></div>
+      <label class="check">Zaman kendiliğinden aksın <input id="cycle" type="checkbox"></label>
+      <label>Deniz durumu <output id="wave-label">Açık deniz</output><input id="waves" type="range" min="0.15" max="2.2" step="0.05" value="1.15"></label>
+      <div class="presets"><button data-sea="0.25">Sakin</button><button data-sea="1.15">Açık deniz</button><button data-sea="1.9">Sert deniz</button></div>
+      <label>Dalga köpüğü <output id="foam-label">100%</output><input id="foam" type="range" min="0" max="2" step="0.1" value="1"></label>
+      <label>Tekne <select id="vessel"><option value="boat">Kıyı 28 · Motorbot</option><option value="ship">Mavi 52 · Gezi gemisi</option></select></label>
+      <label>Görüntü kalitesi <select id="quality"><option value="high">Yüksek</option><option value="medium" selected>Dengeli</option><option value="low">Performans</option></select></label>
+      <div class="actions"><button id="camera">Kamera: Takip</button><button id="sound" aria-pressed="false">Ses: Kapalı</button></div>
+      <div class="engine"><span id="backend">Motor başlatılıyor</span><span id="fps">— FPS</span></div>
+    </aside>
+    <div id="toast" role="status">W ile gaz ver, açık denize çık.</div>
+    <section class="instruments"><div class="speed"><span id="speed">0.0</span><div>KNOT<small id="gear">BOŞTA</small></div></div><div class="divider"></div><div class="instrument"><span>ROTA</span><strong id="heading">000°</strong><small id="direction">KUZEY</small></div><div class="instrument"><span>MESAFE</span><strong id="distance">0.00</strong><small>DENİZ MİLİ</small></div><div class="throttle"><span>GAZ</span><div><i id="throttle-bar"></i></div></div></section>
+    <section class="navigation"><canvas id="radar" width="220" height="220" aria-label="Tekne ve şamandıraları gösteren radar"></canvas><span>SEYİR RADARI <b>500 m</b></span></section>
+    <footer><div><kbd>W</kbd><kbd>S</kbd> Gaz / geri <span></span><kbd>A</kbd><kbd>D</kbd> Dümen <span></span><kbd>SPACE</kbd> Yavaşla <span></span><kbd>C</kbd> Kamera <span></span><kbd>R</kbd> Sıfırla</div><button id="fullscreen">TAM EKRAN ↗</button></footer>
+    <div class="touch-controls"><button data-key="KeyA" aria-label="Sola dön">←</button><button data-key="KeyW" aria-label="Gaz ver">↑</button><button data-key="KeyS" aria-label="Geri git">↓</button><button data-key="KeyD" aria-label="Sağa dön">→</button></div>
+    <span id="camera-hint">Farenle sürükle · Tekerlekle yaklaş</span>
+  </main>
+  <script type="module" src="/src/main.js"></script>
+</body></html>
