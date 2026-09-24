@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {initialState,stepBoat,waveHeight,waveDisplacement,compassHeading,initialBuoyancy,stepBuoyancy,WAVES} from '../src/physics.js';
+import {initialState,stepBoat,waveHeight,waveDisplacement,compassHeading,initialBuoyancy,stepBuoyancy,WAVES,waveAmplitudeScale,waveChoppiness} from '../src/physics.js';
 test('full throttle moves forward and braking reduces speed',()=>{
   const s=initialState();for(let i=0;i<600;i++)stepBoat(s,{forward:true},1/60);
   assert(s.speed>15);assert(s.z< -80);assert(s.distance>80);
@@ -17,6 +17,12 @@ test('integration is stable across frame rates',()=>{
 test('Gerstner heights remain bounded and inverse sampling follows the displaced surface',()=>{
   const limit=WAVES.reduce((n,w)=>n+w.amplitude,0);
   for(let i=0;i<500;i++){const x=i*13,z=-i*7,t=i/3,h=waveHeight(x,z,t,1);assert(Number.isFinite(h));assert(Math.abs(h)<=limit);const d=waveDisplacement(x,z,t,1);assert(Math.abs(waveHeight(x+d.x,z+d.z,t,1)-d.y)<.03);assert.equal(waveHeight(x,z,t,0),0);}
+});
+test('rougher sea states shift wave energy toward longer swells',()=>{
+  assert(waveAmplitudeScale(62,2.2)>waveAmplitudeScale(62,1.15));
+  assert(waveAmplitudeScale(1.35,2.2)<waveAmplitudeScale(1.35,1.15));
+  assert(waveChoppiness(2.2)>waveChoppiness(1.15));
+  assert.equal(waveAmplitudeScale(62,0),0);
 });
 test('a hull above the surface falls under gravity instead of snapping to water',()=>{
   const body={...initialBuoyancy(),initialized:true,y:4},s=initialState();

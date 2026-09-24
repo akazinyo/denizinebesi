@@ -21,9 +21,29 @@ try{
     if(errors.length)throw new Error(errors.join('\n'));console.log('PASS: keyboard propulsion still works after clicking camera');
   }else{
   await page.screenshot({path:gpu?'screenshots/webgpu.png':'screenshots/sunset.png'});
-  await page.keyboard.down('KeyW');await page.waitForTimeout(3000);await page.keyboard.up('KeyW');
+  // Test sound activation, horn, and boat engine revving
+  await page.locator('#sound').click();
+  await page.waitForTimeout(300);
+  if (!await page.evaluate(() => window.__ocean.sound.enabled)) throw new Error('Sound toggle failed');
+  await page.keyboard.down('KeyB');
+  await page.waitForTimeout(200);
+  if (!await page.evaluate(() => window.__ocean.sound.hornActive)) throw new Error('Horn activation failed');
+  await page.keyboard.up('KeyB');
+
+  await page.keyboard.down('KeyW');
+  await page.waitForTimeout(3000);
+  const revving = await page.evaluate(() => ({
+    engineHz: window.__ocean.sound.engineHz,
+    enabled: window.__ocean.sound.enabled,
+  }));
+  if (revving.engineHz <= 35) throw new Error('Boat engine Hz did not rise under throttle');
+
+  await page.keyboard.up('KeyW');
+  await page.waitForTimeout(300);
+  console.log('SOUND TELEMETRY:', revving);
+
   const driven=await page.evaluate(()=>({...window.__ocean.state}));if(!(driven.speed>0&&driven.z<0))throw new Error('Boat did not move');
-  await page.keyboard.down('KeyA');await page.waitForTimeout(1200);await page.keyboard.up('KeyA');
+  await page.keyboard.down('KeyW');await page.keyboard.down('KeyA');await page.waitForTimeout(1500);await page.keyboard.up('KeyA');await page.keyboard.up('KeyW');
   if(await page.evaluate(()=>window.__ocean.state.heading)<=0)throw new Error('Steering failed');
   await page.locator('[data-hour="0"]').click();await page.waitForTimeout(2000);await page.screenshot({path:gpu?'screenshots/webgpu-night.png':'screenshots/night.png'});
   await page.locator('#vessel').selectOption('ship');await page.waitForTimeout(1000);if(!await page.evaluate(()=>window.__ocean.settings.ship))throw new Error('Ship selection failed');

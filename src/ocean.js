@@ -1,6 +1,6 @@
 import * as T from 'three/webgpu';
 import {Fn,positionLocal,positionWorld,cameraPosition,cameraViewMatrix,uniform,vec2,vec3,vec4,float,sin,cos,dot,normalize,mix,pow,max,smoothstep,texture,reflector} from 'three/tsl';
-import {WAVES,waveHeight} from './physics.js';
+import {WAVES,waveAmplitudeScale,waveChoppiness,waveHeight} from './physics.js';
 import {WakeField} from './wake.js';
 import {OceanSimulator} from './vendor/seedocean/fft/ocean-simulator.js';
 import {buildSpectrumParams} from './vendor/seedocean/fft/defaults.js';
@@ -17,7 +17,7 @@ function makeNoise(){
 export class Ocean{
   constructor(renderer){
     this.renderer=renderer;this.root=new T.Group();this.time=uniform(0);this.strength=uniform(1.15);this.origin=uniform(new T.Vector2());this.sunDirection=uniform(new T.Vector3(0,1,0));this.daylight=uniform(1);
-    this.wake=new WakeField();this.wakeOrigin=uniform(this.wake.origin);this.foamAmount=uniform(1);this.buffers=null;this.readPending=false;this.readClock=0;this.readErrors=0;
+    this.wake=new WakeField();this.wakeOrigin=uniform(this.wake.origin);this.buffers=null;this.readPending=false;this.readClock=0;this.readErrors=0;
     this.mode='Gerstner';this.simulator=null;this.noise=makeNoise();
   }
   async init(){
@@ -37,16 +37,19 @@ export class Ocean{
     geometry.computeBoundingSphere();
     const material=new T.MeshStandardNodeMaterial({side:T.FrontSide,metalness:0,roughness:.19});
     const uv=positionLocal.xz.add(this.origin);
-    const gerstnerDisp=Fn(([p])=>{const d=vec3(0).toVar();for(const w of WAVES){const phase=dot(p,vec2(w.x,w.z)).mul(w.k).sub(this.time.mul(w.speed)).add(w.phase),amplitude=this.strength.mul(w.amplitude);d.addAssign(vec3(cos(phase).mul(amplitude).mul(w.chop*w.x),sin(phase).mul(amplitude),cos(phase).mul(amplitude).mul(w.chop*w.z)));}return d;});
-    const gerstnerSurface=Fn(([p])=>{const f=vec4(0).toVar();for(const w of WAVES){const phase=dot(p,vec2(w.x,w.z)).mul(w.k).sub(this.time.mul(w.speed)).add(w.phase),amplitude=this.strength.mul(w.amplitude);f.addAssign(vec4(cos(phase).mul(amplitude).mul(w.k*w.x),cos(phase).mul(amplitude).mul(w.k*w.z),sin(phase).mul(amplitude).mul(w.k*w.chop),sin(phase).mul(amplitude)));}return f;});
+    const intensity=this.strength.sub(.15).div(2.05).clamp(0,1);
+    const amplitudeScale=length=>{const longWave=Math.max(0,Math.min(1,(length-3)/59)),shortWave=1-longWave;return float(.48).add(intensity.mul(.9)).mul(float(1).add(intensity.mul(.42*longWave))).mul(float(1).sub(intensity.mul(.65*shortWave)));};
+    const choppiness=float(1).add(intensity.mul(.32));
+    const gerstnerDisp=Fn(([p])=>{const d=vec3(0).toVar();for(const w of WAVES){const phase=dot(p,vec2(w.x,w.z)).mul(w.k).sub(this.time.mul(w.speed)).add(w.phase),amplitude=amplitudeScale(w.length).mul(w.amplitude);d.addAssign(vec3(cos(phase).mul(amplitude).mul(w.chop*w.x).mul(choppiness),sin(phase).mul(amplitude),cos(phase).mul(amplitude).mul(w.chop*w.z).mul(choppiness)));}return d;});
+    const gerstnerSurface=Fn(([p])=>{const f=vec3(0).toVar();for(const w of WAVES){const phase=dot(p,vec2(w.x,w.z)).mul(w.k).sub(this.time.mul(w.speed)).add(w.phase),amplitude=amplitudeScale(w.length).mul(w.amplitude);f.addAssign(vec3(cos(phase).mul(amplitude).mul(w.k*w.x),cos(phase).mul(amplitude).mul(w.k*w.z),sin(phase).mul(amplitude)));}return f;});
     const displacement=Fn(()=>{
       if(!this.simulator)return gerstnerDisp(uv);
-      const d=vec3(0).toVar();for(const c of this.simulator.cascades)d.addAssign(texture(c.displacement,uv.div(c.lengthScale)).xyz);return d.mul(this.strength);
+      const d=vec3(0).toVar();for(const c of this.simulator.cascades){const displacement=texture(c.displacement,uv.div(c.lengthScale)).xyz,scale=amplitudeScale(c.lengthScale);d.addAssign(vec3(displacement.x.mul(scale).mul(choppiness),displacement.y.mul(scale),displacement.z.mul(scale).mul(choppiness)));}return d;
     })();
     material.positionNode=positionLocal.add(displacement);
     const field=Fn(()=>{
       if(!this.simulator)return gerstnerSurface(uv);
-      const d=vec4(0).toVar();for(const c of this.simulator.cascades){const p=uv.div(c.lengthScale),derivative=texture(c.derivatives,p);d.xy.addAssign(derivative.xy.mul(this.strength));d.z.addAssign(texture(c.foam,p).r);d.w.addAssign(texture(c.displacement,p).y.mul(this.strength));}return d;
+      const d=vec3(0).toVar();for(const c of this.simulator.cascades){const p=uv.div(c.lengthScale),scale=amplitudeScale(c.lengthScale),derivative=texture(c.derivatives,p);d.xy.addAssign(derivative.xy.mul(scale));d.z.addAssign(texture(c.displacement,p).y.mul(scale));}return d;
     })();
     const detail1=texture(this.noise,uv.mul(.12).add(vec2(this.time.mul(.022),this.time.mul(-.015))));
     const detail2=texture(this.noise,uv.mul(.41).add(vec2(this.time.mul(-.035),this.time.mul(.024))));
@@ -54,17 +57,13 @@ export class Ocean{
     const N=normalize(vec3(field.x.add(detail.x).negate(),float(1),field.y.add(detail.y).negate()));
     material.normalNode=normalize(cameraViewMatrix.mul(vec4(N,0)).xyz);
     const worldUV=positionWorld.xz;
-    const foamNoise=texture(this.noise,worldUV.mul(.095).add(vec2(this.time.mul(-.009),this.time.mul(.012)))).r;
     const lace=texture(this.noise,worldUV.mul(.73)).g;
-    const threshold=this.simulator?0:.12;
-    const breaker=smoothstep(float(threshold+.10),float(threshold+.5),field.z.add(foamNoise.sub(.48).mul(.42)));
-    const crest=breaker.mul(smoothstep(.19,.70,foamNoise.add(lace.mul(.32))));
     const wakeUV=worldUV.sub(this.wakeOrigin).div(this.wake.extent).add(.5);
     const inside=smoothstep(0,.035,wakeUV.x).mul(smoothstep(0,.035,wakeUV.y)).mul(smoothstep(0,.035,float(1).sub(wakeUV.x))).mul(smoothstep(0,.035,float(1).sub(wakeUV.y)));
     const wakeFoam=texture(this.wake.texture,wakeUV).r.mul(inside);
-    const coverage=crest.mul(this.foamAmount).add(wakeFoam.mul(lace.mul(.9).add(.65))).clamp(0,1);
+    const coverage=wakeFoam.mul(lace.mul(.9).add(.65)).clamp(0,1);
     const depthColor=uniform(new T.Color(0x053040)),crestColor=uniform(new T.Color(0x107881)),foamColor=uniform(new T.Color(0xd7e5dc));
-    const scatter=smoothstep(-.4,2.6,field.w).mul(pow(max(dot(this.sunDirection,N.negate()).add(.5),0),2)).mul(.7);
+    const scatter=smoothstep(-.4,2.6,field.z).mul(pow(max(dot(this.sunDirection,N.negate()).add(.5),0),2)).mul(.7);
     material.colorNode=mix(mix(depthColor,crestColor,scatter.clamp(0,1)),foamColor,coverage);
     material.roughnessNode=mix(float(.18),float(.82),coverage);
     const reflection=reflector({resolutionScale:.45,bounces:false});reflection.target.rotation.x=-Math.PI/2;this.root.add(reflection.target);
@@ -88,9 +87,9 @@ export class Ocean{
     for(const b of this.buffers){
       const u=((x/b.length%1)+1)%1*n-.5,v=((z/b.length%1)+1)%1*n-.5,ix=Math.floor(u),iz=Math.floor(v),fx=u-ix,fz=v-iz;
       const read=(data,channel)=>{const at=(px,pz)=>data[(((pz+n)%n)*n+(px+n)%n)*2+channel];return T.MathUtils.lerp(T.MathUtils.lerp(at(ix,iz),at(ix+1,iz),fx),T.MathUtils.lerp(at(ix,iz+1),at(ix+1,iz+1),fx),fz);};
-      dy+=read(b.height,0);dx+=read(b.horizontal,0)*this.simulator.lambda.value;dz+=read(b.horizontal,1)*this.simulator.lambda.value;
+      const scale=waveAmplitudeScale(b.length,this.strength.value),choppiness=waveChoppiness(this.strength.value);dy+=read(b.height,0)*scale;dx+=read(b.horizontal,0)*this.simulator.lambda.value*scale*choppiness;dz+=read(b.horizontal,1)*this.simulator.lambda.value*scale*choppiness;
     }
-    return {x:dx*this.strength.value,y:dy*this.strength.value,z:dz*this.strength.value};
+    return {x:dx,y:dy,z:dz};
   }
   getHeight(x,z){
     if(!this.simulator)return waveHeight(x,z,this.time.value,this.strength.value);

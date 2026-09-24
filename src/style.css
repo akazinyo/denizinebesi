@@ -2,3 +2,4 @@
 
 /* Keep the expanded sea controls clear of the radar. */
 .panel{max-height:calc(100vh - 305px);overflow-y:auto;scrollbar-width:thin;scrollbar-color:#c5aa7d55 transparent}.panel label{margin:13px 0}.panel-title{margin-bottom:15px}.engine{font-size:7px;letter-spacing:.7px}@media(max-width:800px){.panel{max-height:calc(100vh - 220px)}}
+.light-settings{border-top:1px solid #ffffff1c;padding-top:13px;margin-top:15px}.light-title{font-size:8px;letter-spacing:1.5px;color:#d3ded1a6;margin-bottom:14px}

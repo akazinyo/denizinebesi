@@ -2,6 +2,8 @@ import * as T from 'three/webgpu';
 
 export function createVessel(large = false) {
   const boat = new T.Group();
+  const modelRoot = new T.Group();
+  boat.add(modelRoot);
   const white = new T.MeshStandardMaterial({color:0xecebe2,roughness:0.28,metalness:0.12});
   const navy = new T.MeshStandardMaterial({color:0x122d3a,roughness:0.25,metalness:0.4});
   const chrome = new T.MeshStandardMaterial({color:0xbeced0,roughness:0.17,metalness:0.85});
@@ -9,7 +11,7 @@ export function createVessel(large = false) {
   const seat = new T.MeshStandardMaterial({color:0xd4c9ad,roughness:0.75});
   const dark = new T.MeshStandardMaterial({color:0x182129,roughness:0.38,metalness:0.35});
   const glass = new T.MeshPhysicalMaterial({color:0x91c9d4,roughness:0.05,metalness:0.35,transparent:true,opacity:0.48,side:T.DoubleSide});
-  function mesh(geo,mat,x=0,y=0,z=0){const m=new T.Mesh(geo,mat);m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;boat.add(m);return m;}
+  function mesh(geo,mat,x=0,y=0,z=0){const m=new T.Mesh(geo,mat);m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;modelRoot.add(m);return m;}
   function box(w,h,d,mat,x,y,z){return mesh(new T.BoxGeometry(w,h,d),mat,x,y,z);}
   function bar(a,b,r=.025,mat=chrome){const start=new T.Vector3(...a),end=new T.Vector3(...b);const m=mesh(new T.CylinderGeometry(r,r,start.distanceTo(end),8),mat);m.position.copy(start).add(end).multiplyScalar(.5);m.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),end.sub(start).normalize());return m;}
   // Cross sections form a pointed bow and a V-shaped keel, rather than a box hull.
@@ -55,6 +57,6 @@ export function createVessel(large = false) {
     box(1.8,.55,1.5,white,0,3.43,1.05);
     boat.scale.set(1.5,1.35,1.65);
   }
-  boat.userData={cabinLight,headlight,lightMaterials};
+  boat.userData={cabinLight,headlight,lightMaterials,modelRoot};
   return boat;
 }

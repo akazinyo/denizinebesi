@@ -5,13 +5,15 @@ import { Ocean } from './ocean.js';
 import { Spray } from './spray.js';
 import { SkyMesh } from 'three/addons/objects/SkyMesh.js';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createVessel } from './vessel.js';
 import { initialState, stepBoat, compassHeading, initialBuoyancy, stepBuoyancy } from './physics.js';
+import { SoundManager } from './audio.js';
 
 const $=id=>document.getElementById(id);
 const state=initialState();
 const body=initialBuoyancy();
-const settings={hour:16,waves:1.15,cycle:false,camera:0,ship:false,quality:'medium'};
+const settings={hour:16,headlightPower:150,headlightEnabled:true,waves:1.15,cycle:false,camera:0,ship:false,quality:'medium'};
 const keys=new Set();
 const scene=new T.Scene();
 const camera=new T.PerspectiveCamera(53,innerWidth/innerHeight,.15,22000);
@@ -43,6 +45,16 @@ const ocean=new Ocean(renderer);scene.add(ocean.root);
 const getHeight=(x,z)=>ocean.getHeight(x,z);
 
 const boat=createVessel(),ship=createVessel(true);scene.add(boat,ship);ship.visible=false;
+const shipModelReady=new GLTFLoader().loadAsync('/models/mavi52-flybridge-yacht.glb').then(({scene:model})=>{
+  const size=1.15,scale=ship.scale;
+  model.scale.set(size/scale.x,size/scale.y,size/scale.z);
+  model.position.y=-size/scale.y;
+  model.rotation.y=Math.PI;
+  model.traverse(object=>{if(object.isMesh){object.castShadow=true;object.receiveShadow=true;}});
+  ship.userData.modelRoot.visible=false;
+  ship.add(model);
+  ship.userData.importedModel=model;
+}).catch(error=>console.warn('Mavi 52 modeli yüklenemedi; yerleşik model kullanılacak.',error));
 let activeVessel=boat;
 const buoys=[];
 for(let i=0;i<10;i++){
@@ -66,12 +78,13 @@ let cameraSeaY=0;
 let pipeline,simTime=0,lastTime=0,frameCounter=0,fpsTime=0,lightingTimer=1,hudTimer=0;
 let azimuth=.52,elevation=.25,cameraDistance=24,dragging=false,pointerX=0,pointerY=0;
 const cameraTarget=new T.Vector3(),desiredCamera=new T.Vector3(),up=new T.Vector3(0,1,0);
-let audioContext,engineOsc,engineGain,seaGain,audioOn=false;
+const sound=new SoundManager();
 function toggleSound(){
-  if(!audioContext){audioContext=new AudioContext();const length=audioContext.sampleRate*3,buffer=audioContext.createBuffer(1,length,audioContext.sampleRate),data=buffer.getChannelData(0);let sample=0;for(let i=0;i<length;i++){sample=(sample+Math.random()*.04-.02)*.98;data[i]=sample;}
-    const noise=audioContext.createBufferSource();noise.buffer=buffer;noise.loop=true;const filter=audioContext.createBiquadFilter();filter.type='lowpass';filter.frequency.value=750;seaGain=audioContext.createGain();noise.connect(filter).connect(seaGain).connect(audioContext.destination);noise.start();
-    engineOsc=audioContext.createOscillator();engineOsc.type='sawtooth';engineGain=audioContext.createGain();const ef=audioContext.createBiquadFilter();ef.type='lowpass';ef.frequency.value=180;engineOsc.connect(ef).connect(engineGain).connect(audioContext.destination);engineOsc.start();}
-  audioOn=!audioOn;audioContext.resume();$('sound').textContent=`Ses: ${audioOn?'Açık':'Kapalı'}`;$('sound').setAttribute('aria-pressed',audioOn);
+  document.activeElement?.blur();
+  const on=sound.toggle();
+  $('sound').textContent=`Ses: ${on?'Açık':'Kapalı'}`;
+  $('sound').setAttribute('aria-pressed',on);
+  if(on)notify(settings.ship?'Mavi 52 · Ağır deniz dizeli devrede.':'Kıyı 28 · Motorbot sesi devrede.');
 }
 function notify(message){$('toast').textContent=message;$('toast').style.opacity=1;clearTimeout(notify.timeout);notify.timeout=setTimeout(()=>$('toast').style.opacity=0,5500);}
 function setCamera(){settings.camera=(settings.camera+1)%3;$('camera').textContent=`Kamera: ${['Takip','Kaptan','Yörünge'][settings.camera]}`;notify(['Takip kamerası · Fareyle etrafına bak.','Kaptan köşkü · Ufka doğru.','Yörünge kamerası · Fareyle sürükle, tekerlekle yaklaş.'][settings.camera]);}
@@ -89,7 +102,7 @@ function updateLighting(){
   renderer.toneMappingExposure=.65-daylight*.28;
   ocean.sunDirection.value.copy(lightDir);ocean.daylight.value=daylight;
   stars.material.opacity=1-daylight;stars.visible=daylight<.98;moon.visible=daylight<.8;moon.position.copy(moonDirection).multiplyScalar(6500).add(new T.Vector3(state.x,0,state.z));
-  for(const v of [boat,ship]){v.userData.cabinLight.intensity=(1-daylight)*35;v.userData.headlight.intensity=(1-daylight)*90;}
+  for(const v of [boat,ship]){v.userData.cabinLight.intensity=(1-daylight)*35;v.userData.headlight.intensity=(1-daylight)*(settings.headlightEnabled?settings.headlightPower:0);}
 
   const h=Math.floor(settings.hour),m=Math.floor(settings.hour%1*60);$('time-label').textContent=`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
 }
@@ -123,24 +136,25 @@ function animate(now){
   }
   if(settings.cycle){settings.hour=(settings.hour+dt*.045)%24;$('time').value=settings.hour;}
   lightingTimer+=dt;if(lightingTimer>.1){updateLighting();lightingTimer=0;}
-  if(audioContext){engineOsc.frequency.setTargetAtTime(28+Math.abs(state.speed)*3,audioContext.currentTime,.15);engineGain.gain.setTargetAtTime(audioOn?.015+Math.abs(state.throttle)*.035:0,audioContext.currentTime,.1);seaGain.gain.setTargetAtTime(audioOn?.55+settings.waves*.2:0,audioContext.currentTime,.1);}
+  sound.update(state, body, dt, settings.ship, settings);
   hudTimer+=dt;if(hudTimer>.1){updateHUD();hudTimer=0;}frameCounter++;fpsTime+=realDt;if(fpsTime>1){$('fps').textContent=Math.round(frameCounter/fpsTime)+' FPS';frameCounter=0;fpsTime=0;}
   pipeline.render();
 }
 
-document.addEventListener('keydown',e=>{if(['INPUT','SELECT'].includes(document.activeElement?.tagName)||(e.code==='Space'&&document.activeElement?.tagName==='BUTTON'))return;if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();keys.add(e.code);if(!e.repeat){if(e.code==='KeyC')setCamera();if(e.code==='KeyR'){Object.assign(state,initialState());Object.assign(body,initialBuoyancy());ocean.wake.reset();spray.reset();notify('Yeni bir rota, yeni bir başlangıç.');}if(e.code==='KeyH')$('settings').classList.toggle('hidden');}});
-document.addEventListener('keyup',e=>keys.delete(e.code));window.addEventListener('blur',()=>keys.clear());document.addEventListener('visibilitychange',()=>{keys.clear();lastTime=performance.now();});
+document.addEventListener('keydown',e=>{if(['INPUT','SELECT'].includes(document.activeElement?.tagName)||(e.code==='Space'&&document.activeElement?.tagName==='BUTTON'))return;if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();keys.add(e.code);if(!e.repeat){if(e.code==='KeyB')sound.triggerHorn(true);if(e.code==='KeyC')setCamera();if(e.code==='KeyR'){Object.assign(state,initialState());Object.assign(body,initialBuoyancy());ocean.wake.reset();spray.reset();sound.engineHz=settings.ship?14:28;notify('Yeni bir rota, yeni bir başlangıç.');}if(e.code==='KeyH')$('settings').classList.toggle('hidden');}});
+document.addEventListener('keyup',e=>{keys.delete(e.code);if(e.code==='KeyB')sound.triggerHorn(false);});window.addEventListener('blur',()=>keys.clear());document.addEventListener('visibilitychange',()=>{keys.clear();lastTime=performance.now();});
 const canvas=renderer.domElement;
 canvas.addEventListener('pointerdown',e=>{dragging=true;pointerX=e.clientX;pointerY=e.clientY;canvas.setPointerCapture(e.pointerId);document.activeElement?.blur();});canvas.addEventListener('pointermove',e=>{if(dragging){azimuth-=(e.clientX-pointerX)*.005;elevation=T.MathUtils.clamp(elevation+(e.clientY-pointerY)*.004,.07,1.2);pointerX=e.clientX;pointerY=e.clientY;}});canvas.addEventListener('pointerup',()=>dragging=false);canvas.addEventListener('pointercancel',()=>dragging=false);canvas.addEventListener('wheel',e=>{cameraDistance=T.MathUtils.clamp(cameraDistance+e.deltaY*.025,12,100);e.preventDefault();},{passive:false});
-document.querySelectorAll('[data-key]').forEach(button=>{button.addEventListener('pointerdown',e=>{e.preventDefault();keys.add(button.dataset.key);button.setPointerCapture(e.pointerId);});for(const event of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(event,()=>keys.delete(button.dataset.key));});
+document.querySelectorAll('[data-key]').forEach(button=>{button.addEventListener('pointerdown',e=>{e.preventDefault();keys.add(button.dataset.key);button.setPointerCapture(e.pointerId);if(button.dataset.key==='KeyB')sound.triggerHorn(true);});for(const event of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(event,()=>{keys.delete(button.dataset.key);if(button.dataset.key==='KeyB')sound.triggerHorn(false);});});
 $('settings-toggle').onclick=()=>$('settings').classList.toggle('hidden');$('camera').onclick=setCamera;$('sound').onclick=toggleSound;
 $('time').oninput=e=>{settings.hour=+e.target.value;document.querySelectorAll('[data-hour]').forEach(b=>b.classList.remove('active'));updateLighting();};
 document.querySelectorAll('[data-hour]').forEach(button=>button.onclick=()=>{settings.hour=+button.dataset.hour;$('time').value=settings.hour;document.querySelectorAll('[data-hour]').forEach(b=>b.classList.toggle('active',b===button));updateLighting();button.blur();});
 $('cycle').onchange=e=>settings.cycle=e.target.checked;
-$('foam').oninput=e=>{ocean.foamAmount.value=+e.target.value;$('foam-label').textContent=Math.round(+e.target.value*100)+'%';};
+$('headlight-enabled').onchange=e=>{settings.headlightEnabled=e.target.checked;updateLighting();};
+$('headlight-power').oninput=e=>{settings.headlightPower=+e.target.value;$('headlight-power-label').textContent=e.target.value;updateLighting();};
 document.querySelectorAll('[data-sea]').forEach(button=>button.onclick=()=>{$('waves').value=button.dataset.sea;$('waves').dispatchEvent(new Event('input'));});
 $('waves').oninput=e=>{settings.waves=+e.target.value;$('wave-label').textContent=settings.waves<.4?'Sakin':settings.waves<.9?'Hafif dalgalı':settings.waves<1.6?'Açık deniz':'Sert deniz';sky.cloudCoverage.value=.2+settings.waves*.15;};
-$('vessel').onchange=e=>{settings.ship=e.target.value==='ship';boat.visible=!settings.ship;ship.visible=settings.ship;activeVessel=settings.ship?ship:boat;Object.assign(body,initialBuoyancy());notify(settings.ship?'Mavi 52 · Daha ağır gövde, daha yumuşak dönüş.':'Kıyı 28 · Gazı aç, ufka yaklaş.');e.target.blur();};
+$('vessel').onchange=e=>{settings.ship=e.target.value==='ship';boat.visible=!settings.ship;ship.visible=settings.ship;activeVessel=settings.ship?ship:boat;Object.assign(body,initialBuoyancy());notify(settings.ship?'Mavi 52 · Ağır deniz dizeli devrede.':'Kıyı 28 · Gazı aç, ufka yaklaş.');e.target.blur();};
 $('quality').onchange=e=>{settings.quality=e.target.value;renderer.setPixelRatio(Math.min(devicePixelRatio,{low:1,medium:1.5,high:2}[settings.quality]));renderer.shadowMap.enabled=settings.quality!=='low';e.target.blur();};
 $('fullscreen').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen();}catch{notify('Bu tarayıcıda tam ekran kullanılamıyor.');}};
 window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
@@ -149,8 +163,8 @@ if(innerWidth<800)$('settings').classList.add('hidden');
 async function init(){
   try{
     await renderer.init();
-    $('loading-message').textContent='Dalga spektrumu ve köpük alanı hazırlanıyor…';
-    await ocean.init();
+    $('loading-message').textContent='Dalga ve gemi modeli hazırlanıyor…';
+    await Promise.all([ocean.init(),shipModelReady]);
     $('backend').textContent=(renderer.backend.isWebGPUBackend?'WEBGPU':'WEBGL2')+' · '+ocean.mode;
     pipeline=new T.RenderPipeline(renderer);const scenePass=pass(scene,camera),color=scenePass.getTextureNode('output');pipeline.outputNode=color.add(bloom(color.clamp(0,4),.12,.25,1.15));
     updateLighting();updateHUD();
@@ -158,7 +172,7 @@ async function init(){
     renderer.setAnimationLoop(animate);
     $('loading').classList.add('done');notify('W ile gaz ver, açık denize çık.');
     // Read-only diagnostics for automated smoke tests and troubleshooting.
-    window.__ocean={state,body,settings,renderer,scene,ocean,get frames(){return renderer.info.render.frameCalls;},get ready(){return true;}};
+    window.__ocean={state,body,settings,renderer,scene,ocean,sound,get frames(){return renderer.info.render.frameCalls;},get ready(){return true;}};
   }catch(error){console.error(error);showGraphicsError(error.message);}
 }
 function showGraphicsError(message){

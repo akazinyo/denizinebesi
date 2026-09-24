@@ -4,11 +4,26 @@ export const WAVES = [
   [.32, 15, 1.70, 1.7], [.22, 10, .35, 5.3], [.16, 7.1, 2.25, .8],
   [.10, 4.8, 1.05, 3.1], [.065, 3.3, -.45, 4.8], [.042, 2.1, 1.9, 2.5],
   [.028, 1.35, .64, 5.9], [.017, .86, 2.7, 1.4], [.012, .57, -.7, 3.8],
-].map(([amplitude,length,angle,phase])=>({amplitude,k:2*Math.PI/length,x:Math.cos(angle),z:Math.sin(angle),speed:Math.sqrt(9.81*2*Math.PI/length),phase,chop:.48}));
+].map(([amplitude,length,angle,phase])=>({amplitude,length,k:2*Math.PI/length,x:Math.cos(angle),z:Math.sin(angle),speed:Math.sqrt(9.81*2*Math.PI/length),phase,chop:.48}));
+
+// Compress the sea-state range and shift energy toward long swells as conditions rise.
+export function waveAmplitudeScale(length, seaState) {
+  if (seaState <= 0) return 0;
+  const intensity = Math.max(0, Math.min(1, (seaState - .15) / 2.05));
+  const longWave = Math.max(0, Math.min(1, (length - 3) / 59));
+  const shortWave = 1 - longWave;
+  return (.48 + intensity * .9) * (1 + intensity * .42 * longWave) * (1 - intensity * .65 * shortWave);
+}
+
+export function waveChoppiness(seaState) {
+  const intensity = Math.max(0, Math.min(1, (seaState - .15) / 2.05));
+  return 1 + intensity * .32;
+}
 
 export function waveDisplacement(x,z,time,strength){
   let dx=0,dy=0,dz=0;
-  for(const w of WAVES){const phase=(x*w.x+z*w.z)*w.k-time*w.speed+w.phase,a=w.amplitude*strength;dy+=Math.sin(phase)*a;dx+=Math.cos(phase)*a*w.chop*w.x;dz+=Math.cos(phase)*a*w.chop*w.z;}
+  const choppiness=waveChoppiness(strength);
+  for(const w of WAVES){const phase=(x*w.x+z*w.z)*w.k-time*w.speed+w.phase,a=w.amplitude*waveAmplitudeScale(w.length,strength);dy+=Math.sin(phase)*a;dx+=Math.cos(phase)*a*w.chop*choppiness*w.x;dz+=Math.cos(phase)*a*w.chop*choppiness*w.z;}
   return {x:dx,y:dy,z:dz};
 }
 export function waveHeight(x, z, time, strength) {

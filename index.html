@@ -10,10 +10,14 @@
     <aside id="settings" class="panel"><div class="panel-title">SEYİR AYARLARI <span>01 / 04</span></div>
       <label>Günün saati <output id="time-label">16:00</output><input id="time" type="range" min="0" max="23.99" step="0.01" value="16"></label>
       <div class="presets"><button data-hour="12">Gündüz</button><button data-hour="17.5">Gün batımı</button><button data-hour="0">Gece</button></div>
+      <div class="light-settings">
+        <div class="light-title">IŞIK AYARLARI</div>
+        <label class="check">Gece ön farı <input id="headlight-enabled" type="checkbox" checked></label>
+        <label>Far şiddeti <output id="headlight-power-label">150</output><input id="headlight-power" type="range" min="0" max="300" step="10" value="150"></label>
+      </div>
       <label class="check">Zaman kendiliğinden aksın <input id="cycle" type="checkbox"></label>
       <label>Deniz durumu <output id="wave-label">Açık deniz</output><input id="waves" type="range" min="0.15" max="2.2" step="0.05" value="1.15"></label>
       <div class="presets"><button data-sea="0.25">Sakin</button><button data-sea="1.15">Açık deniz</button><button data-sea="1.9">Sert deniz</button></div>
-      <label>Dalga köpüğü <output id="foam-label">100%</output><input id="foam" type="range" min="0" max="2" step="0.1" value="1"></label>
       <label>Tekne <select id="vessel"><option value="boat">Kıyı 28 · Motorbot</option><option value="ship">Mavi 52 · Gezi gemisi</option></select></label>
       <label>Görüntü kalitesi <select id="quality"><option value="high">Yüksek</option><option value="medium" selected>Dengeli</option><option value="low">Performans</option></select></label>
       <div class="actions"><button id="camera">Kamera: Takip</button><button id="sound" aria-pressed="false">Ses: Kapalı</button></div>
@@ -22,8 +26,8 @@
     <div id="toast" role="status">W ile gaz ver, açık denize çık.</div>
     <section class="instruments"><div class="speed"><span id="speed">0.0</span><div>KNOT<small id="gear">BOŞTA</small></div></div><div class="divider"></div><div class="instrument"><span>ROTA</span><strong id="heading">000°</strong><small id="direction">KUZEY</small></div><div class="instrument"><span>MESAFE</span><strong id="distance">0.00</strong><small>DENİZ MİLİ</small></div><div class="throttle"><span>GAZ</span><div><i id="throttle-bar"></i></div></div></section>
     <section class="navigation"><canvas id="radar" width="220" height="220" aria-label="Tekne ve şamandıraları gösteren radar"></canvas><span>SEYİR RADARI <b>500 m</b></span></section>
-    <footer><div><kbd>W</kbd><kbd>S</kbd> Gaz / geri <span></span><kbd>A</kbd><kbd>D</kbd> Dümen <span></span><kbd>SPACE</kbd> Yavaşla <span></span><kbd>C</kbd> Kamera <span></span><kbd>R</kbd> Sıfırla</div><button id="fullscreen">TAM EKRAN ↗</button></footer>
-    <div class="touch-controls"><button data-key="KeyA" aria-label="Sola dön">←</button><button data-key="KeyW" aria-label="Gaz ver">↑</button><button data-key="KeyS" aria-label="Geri git">↓</button><button data-key="KeyD" aria-label="Sağa dön">→</button></div>
+    <footer><div><kbd>W</kbd><kbd>S</kbd> Gaz / geri <span></span><kbd>A</kbd><kbd>D</kbd> Dümen <span></span><kbd>SPACE</kbd> Yavaşla <span></span><kbd>B</kbd> Korna <span></span><kbd>C</kbd> Kamera <span></span><kbd>R</kbd> Sıfırla</div><button id="fullscreen">TAM EKRAN ↗</button></footer>
+    <div class="touch-controls"><button data-key="KeyA" aria-label="Sola dön">←</button><button data-key="KeyW" aria-label="Gaz ver">↑</button><button data-key="KeyS" aria-label="Geri git">↓</button><button data-key="KeyD" aria-label="Sağa dön">→</button><button data-key="KeyB" aria-label="Korna">📯</button></div>
     <span id="camera-hint">Farenle sürükle · Tekerlekle yaklaş</span>
   </main>
   <script type="module" src="/src/main.js"></script>

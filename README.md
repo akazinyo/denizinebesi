@@ -12,17 +12,22 @@ WebGPU destekleyen güncel Chrome/Edge ve donanım hızlandırması önerilir. W
 
 - **W / ↑:** ileri gaz, **S / ↓:** geri gaz. Bırakınca tekne ataletle yavaşlar.
 - **A / D veya ← / →:** dümen. Dururken tekne kendi ekseninde dönmez.
-- **Boşluk:** hızlı yavaşlama.
+- **Boşluk:** hızlı yavaşlama; **B:** marin korna / sis düdüğü.
 - **C:** takip, kaptan, yörünge kamerası.
 - **Fare sürükleme / tekerlek:** dış kameralarda açı / mesafe.
 - **R:** başlangıca dön; **H:** ayar panelini aç/kapat.
-- Dokunmatik ekranlarda alttaki yön düğmeleri kullanılabilir.
+- Dokunmatik ekranlarda alttaki yön ve korna düğmeleri kullanılabilir.
 
 Panelden günün saati, otomatik zaman akışı, dalga şiddeti, tekne, kalite ve ses değişir. Ses kullanıcı tıklamasıyla açılır. Radar 500 metre yarıçapındaki şamandıraları gösterir.
 
-## Görüntü ve simülasyon
+## Görüntü, Ses ve Simülasyon
 
-GPU üzerinde dört sinüs dalgası, teknenin altında aynı dalgaları örnekleyen yüzme/yatma hareketi, çok ölçekli su normalleri, düzlemsel sahne yansımaları, Fresnel su rengi, güneş/ay parlaması, gövde gölgeleri, atmosferik gökyüzü ve bulutlar, yıldızlar, seyir ışıkları, motor izi ve bloom kullanılır. İki teknenin hız/dönüş davranışları farklıdır.
+GPU üzerinde dört sinüs dalgası, teknenin altında aynı dalgaları örnekleyen yüzme/yatma hareketi, çok ölçekli su normalleri, düzlemsel sahne yansımaları, Fresnel su rengi, güneş/ay parlaması, gövde gölgeleri, atmosferik gökyüzü ve bulutlar, yıldızlar, seyir ışıkları, motor izi ve bloom kullanılır.
+
+Ses motoru procedural Web Audio mimarisiyle fizik ve hızla anlık senkronize çalışır (sıfır ses dosyası döngüsü, loopsuz kesintisiz sentez):
+- **Kıyı 28 (Motorbot):** 28-135 Hz kesintisiz dıştan takma motor sentezi; hıza ve gaza göre devir yükselmesi, su altı egzoz susturucu filtre modülasyonu (260-1160 Hz).
+- **Mavi 52 (Ağır Deniz Dizeli):** 14-42 Hz derin piston vuruşları, çelik gövde sub-bass rezonansı (45 Hz) ve devasa pervane su çalkantısı.
+- **Çevre ve Darbeler:** Dalgalardan zıplayıp havalanınca pervane devir yükselmesi (rev flare), dalgaya çarpınca gövde tokmağı ve su serpintisi patlaması, hızla artan tekne gövdesi su sürtüşü ve marin kornalar.
 
 Bu görsel bir simülasyondur; mühendislik düzeyinde akışkanlar veya gemi hidrodinamiği çözümü değildir. Su yansıması dalga normalleriyle bozulan düzlemsel yansımadır; ışın izleme değildir. Şamandıralar ve uzak adalar manzaradır, çarpışma sistemi yoktur.
 
